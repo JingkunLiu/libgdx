@@ -30,12 +30,14 @@ public class Timer {
 
 	/** Timer instance for general application wide usage. Static methods on {@link Timer} make convenient use of this instance. */
 	static Timer instance = new Timer();
-	static public Timer instance() {
+
+	static public Timer instance () {
 		if (instance == null) {
 			instance = new Timer();
 		}
 		return instance;
 	}
+
 	private final Array<Task> tasks = new Array(false, 8);
 
 	public Timer () {
@@ -185,12 +187,17 @@ public class Timer {
 		public boolean isScheduled () {
 			return repeatCount != CANCELLED;
 		}
+
+		/** Returns the time when this task will be executed in milliseconds */
+		public long getExecuteTimeMillis () {
+			return executeTimeMillis;
+		}
 	}
 
 	/** Manages the single timer thread. Stops thread on libgdx application pause and dispose, starts thread on resume.
 	 * @author Nathan Sweet */
 	static class TimerThread implements Runnable, LifecycleListener {
-		private Application app;
+		Application app;
 		private long pauseMillis;
 
 		public TimerThread () {
@@ -239,12 +246,12 @@ public class Timer {
 				app = null;
 				wake();
 			}
+			thread = null;
 		}
 
 		public void dispose () {
 			pause();
 			Gdx.app.removeLifecycleListener(this);
-			thread = null;
 			instances.clear();
 			instance = null;
 		}

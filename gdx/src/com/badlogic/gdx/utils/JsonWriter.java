@@ -18,6 +18,8 @@ package com.badlogic.gdx.utils;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.regex.Pattern;
 
 /** Builder style API for emitting JSON.
@@ -28,6 +30,7 @@ public class JsonWriter extends Writer {
 	private JsonObject current;
 	private boolean named;
 	private OutputType outputType = OutputType.json;
+	private boolean quoteLongValues = false;
 
 	public JsonWriter (Writer writer) {
 		this.writer = writer;
@@ -37,8 +40,15 @@ public class JsonWriter extends Writer {
 		return writer;
 	}
 
+	/** Sets the type of JSON output. Default is {@link OutputType#minimal}. */
 	public void setOutputType (OutputType outputType) {
 		this.outputType = outputType;
+	}
+
+	/** When true, quotes long, double, BigInteger, BigDecimal types to prevent truncation in languages like JavaScript and PHP.
+	 * This is not necessary when using libgdx, which handles these types without truncation. Default is false. */
+	public void setQuoteLongValues (boolean quoteLongValues) {
+		this.quoteLongValues = quoteLongValues;
 	}
 
 	public JsonWriter name (String name) throws IOException {
@@ -86,7 +96,10 @@ public class JsonWriter extends Writer {
 	}
 
 	public JsonWriter value (Object value) throws IOException {
-		if (value instanceof Number) {
+		if (quoteLongValues
+			&& (value instanceof Long || value instanceof Double || value instanceof BigDecimal || value instanceof BigInteger)) {
+			value = String.valueOf(value);
+		} else if (value instanceof Number) {
 			Number number = (Number)value;
 			long longValue = number.longValue();
 			if (number.doubleValue() == longValue) value = longValue;
@@ -158,33 +171,33 @@ public class JsonWriter extends Writer {
 		json,
 		/** Like JSON, but names are only quoted if necessary. */
 		javascript,
-		/** Like JSON, but names and values are only quoted if necessary. */
+		/** Like JSON, but names and values are only quoted if they don't contain <code>\r\n\t</code> or <code>space</code> and don't
+		 * begin with <code>/{}[]:,"</code>. Additionally, names cannot contain <code>:</code> and values cannot contain
+		 * <code>}],</code>. */
 		minimal;
 
 		static private Pattern javascriptPattern = Pattern.compile("[a-zA-Z_$][a-zA-Z_$0-9]*");
-		static private Pattern minimalValuePattern = Pattern.compile("[a-zA-Z_$][^:}\\], ]*");
-		static private Pattern minimalNamePattern = Pattern.compile("[a-zA-Z0-9_$][^:}\\], ]*");
+		static private Pattern minimalNamePattern = Pattern.compile("[^/{}\\[\\],\":\\r\\n\\t ][^:\\r\\n\\t ]*");
+		static private Pattern minimalValuePattern = Pattern.compile("[^/{}\\[\\],\":\\r\\n\\t ][^}\\],\\r\\n\\t ]*");
 
 		public String quoteValue (Object value) {
 			if (value == null || value instanceof Number || value instanceof Boolean) return String.valueOf(value);
-			String string = String.valueOf(value).replace("\\", "\\\\");
+			String string = String.valueOf(value).replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n")
+				.replace("\t", "\\t");
 			if (this == OutputType.minimal && !string.equals("true") && !string.equals("false") && !string.equals("null")
 				&& minimalValuePattern.matcher(string).matches()) return string;
 			return '"' + string.replace("\"", "\\\"") + '"';
 		}
 
 		public String quoteName (String value) {
-			value = value.replace("\\", "\\\\");
+			value = value.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t");
 			switch (this) {
 			case minimal:
 				if (minimalNamePattern.matcher(value).matches()) return value;
-				return '"' + value.replace("\"", "\\\"") + '"';
 			case javascript:
 				if (javascriptPattern.matcher(value).matches()) return value;
-				return '"' + value.replace("\"", "\\\"") + '"';
-			default:
-				return '"' + value.replace("\"", "\\\"") + '"';
 			}
+			return '"' + value.replace("\"", "\\\"") + '"';
 		}
 	}
 }
